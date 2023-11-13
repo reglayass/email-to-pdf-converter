@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,9 +21,20 @@ import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.html.HtmlEscapers;
 import com.google.common.io.ByteStreams;
-import com.google.common.io.CharSink;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
+
+import java.io.*;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.text.DateFormat;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.mail.MessagingException;
+import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeUtility;
 import org.apache.tika.mime.MimeTypes;
 import org.simplejavamail.api.email.AttachmentResource;
 import org.simplejavamail.converter.EmailConverter;
@@ -33,22 +44,9 @@ import util.StringReplacer;
 import util.StringReplacerCallback;
 import java.util.HashMap;
 
-import javax.mail.internet.MimeMessage;
-import javax.mail.internet.MimeUtility;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.text.DateFormat;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 /**
  * Converts email (eml, msg) files into pdf files.
+ *
  * @author Nick Russler
  */
 public class MimeMessageConverter {
@@ -81,19 +79,20 @@ public class MimeMessageConverter {
     private static final String ADD_HEADER_IFRAME_JS_TAG_TEMPLATE = "<script id=\"header-v6a8oxpf48xfzy0rhjra\" data-file=\"%s\" type=\"text/javascript\">%s</script>";
     private static final String HEADER_FIELD_TEMPLATE = "<tr><td class=\"header-name\">%s</td><td class=\"header-value\">%s</td></tr>";
 
-    private static final Pattern HTML_META_CHARSET_REGEX = Pattern.compile("(<meta(?!\\s*(?:name|value)\\s*=)[^>]*?charset\\s*=[\\s\"']*)([^\\s\"'/>]*)", Pattern.DOTALL);
+    private static final Pattern HTML_META_CHARSET_REGEX = Pattern.compile(
+            "(<meta(?!\\s*(?:name|value)\\s*=)[^>]*?charset\\s*=[\\s\"']*)([^\\s\"'/>]*)", Pattern.DOTALL);
 
     private static final Pattern IMG_CID_REGEX = Pattern.compile("cid:(.*?)\"", Pattern.DOTALL);
     private static final Pattern IMG_CID_PLAIN_REGEX = Pattern.compile("\\[cid:(.*?)\\]", Pattern.DOTALL);
 
     private static final String VIEWPORT_SIZE = "2480x3508";
-    private static final int CONVERSION_DPI = 300;
     private static final int IMAGE_QUALITY = 100;
 
     private static final DateFormat DATE_FORMATTER = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.LONG);
 
     /**
      * Execute a command and redirect its output to the standard output.
+     *
      * @param command list of the command and its parameters
      */
     private static void execCommand(List<String> command) {
@@ -113,15 +112,18 @@ public class MimeMessageConverter {
 
     /**
      * Convert an email (eml, msg) file to PDF.
+     *
      * @throws Exception
      */
-    public static void convertToPdf(String emailFilePath, String pdfOutputPath, boolean hideHeaders, boolean extractAttachments, String attachmentsdir, List<String> extParams) throws Exception {
+    public static void convertToPdf(
+                                    String emailFilePath, String pdfOutputPath, boolean hideHeaders, boolean extractAttachments, String attachmentsdir, List<String> extParams) throws Exception {
         Logger.info("Start converting %s to %s", emailFilePath, pdfOutputPath);
 
         final MimeMessage message;
         if (emailFilePath.toLowerCase().endsWith(".msg")) {
             Logger.debug("Read msg file from %s, convert it to eml", emailFilePath);
-            message = new MimeMessage(null, new ByteArrayInputStream(EmailConverter.outlookMsgToEML(new FileInputStream(emailFilePath)).getBytes(StandardCharsets.UTF_8)));
+            message = new MimeMessage(
+                    null, new ByteArrayInputStream(EmailConverter.outlookMsgToEML(new FileInputStream(emailFilePath)).getBytes(StandardCharsets.UTF_8)));
         } else {
             Logger.debug("Read eml file from %s", emailFilePath);
             message = new MimeMessage(null, new FileInputStream(emailFilePath));
@@ -129,7 +131,8 @@ public class MimeMessageConverter {
 
         /* ######### Parse Header Fields ######### */
         Logger.debug("Read and decode header fields");
-        String subject = message.getSubject();
+
+        String subject = parseSubject(message);
 
         String from = message.getHeader("From", null);
         if (from == null) {
@@ -222,14 +225,16 @@ public class MimeMessageConverter {
                     String declaredCharset = m.group(2);
 
                     if (!charsetName.equalsIgnoreCase(declaredCharset)) {
-                        Logger.debug("Html declared different charset (%s) then the email header (%s), override with email header", declaredCharset, charsetName);
+                        Logger.debug(
+                                "Html declared different charset (%s) then the email header (%s), override with email header", declaredCharset, charsetName);
                     }
 
                     return m.group(1) + charsetName;
                 }
             });
         } else {
-            Logger.debug("No html message body could be found, fall back to text/plain and embed it into a html document");
+            Logger.debug(
+                    "No html message body could be found, fall back to text/plain and embed it into a html document");
 
             htmlBody = "<div style=\"white-space: pre-wrap\">" + htmlBody.replace("\n", "<br>").replace("\r", "") + "</div>";
 
@@ -284,15 +289,18 @@ public class MimeMessageConverter {
             String headers = "";
 
             if (!Strings.isNullOrEmpty(from)) {
-                headers += String.format(HEADER_FIELD_TEMPLATE, "From", HtmlEscapers.htmlEscaper().escape(from));
+                headers += String.format(
+                        HEADER_FIELD_TEMPLATE, "From", HtmlEscapers.htmlEscaper().escape(from));
             }
 
             if (!Strings.isNullOrEmpty(subject)) {
-                headers += String.format(HEADER_FIELD_TEMPLATE, "Subject", "<b>" + HtmlEscapers.htmlEscaper().escape(subject) + "<b>");
+                headers += String.format(
+                        HEADER_FIELD_TEMPLATE, "Subject", "<b>" + HtmlEscapers.htmlEscaper().escape(subject) + "<b>");
             }
 
             if (recipients.length > 0) {
-                headers += String.format(HEADER_FIELD_TEMPLATE, "To", HtmlEscapers.htmlEscaper().escape(Joiner.on(", ").join(recipients)));
+                headers += String.format(
+                        HEADER_FIELD_TEMPLATE, "To", HtmlEscapers.htmlEscaper().escape(Joiner.on(", ").join(recipients)));
             }
 
             if (cc.length > 0) {
@@ -300,14 +308,16 @@ public class MimeMessageConverter {
             }
 
             if (!Strings.isNullOrEmpty(sentDateStr)) {
-                headers += String.format(HEADER_FIELD_TEMPLATE, "Date", HtmlEscapers.htmlEscaper().escape(sentDateStr));
+                headers += String.format(
+                        HEADER_FIELD_TEMPLATE, "Date", HtmlEscapers.htmlEscaper().escape(sentDateStr));
             }
 
             Files.asCharSink(tmpHtmlHeader, StandardCharsets.UTF_8).write(String.format(tmpHtmlHeaderStr, headers));
 
             // Append this script tag dirty to the bottom
             URL contentScriptResource = MimeMessageConverter.class.getClassLoader().getResource("contentScript.js");
-            htmlBody += String.format(ADD_HEADER_IFRAME_JS_TAG_TEMPLATE, tmpHtmlHeader.toURI(), Resources.toString(contentScriptResource, StandardCharsets.UTF_8));
+            htmlBody += String.format(
+                    ADD_HEADER_IFRAME_JS_TAG_TEMPLATE, tmpHtmlHeader.toURI(), Resources.toString(contentScriptResource, StandardCharsets.UTF_8));
         }
 
         File tmpHtml = File.createTempFile("emailtopdf", ".html");
@@ -317,13 +327,10 @@ public class MimeMessageConverter {
         File pdf = new File(pdfOutputPath);
         Logger.debug("Write pdf to %s", pdf.getAbsolutePath());
 
-        List<String> cmd = new ArrayList<>(Arrays.asList("wkhtmltopdf",
-                "--viewport-size", VIEWPORT_SIZE,
-                "--enable-local-file-access",
+        List<String> cmd = new ArrayList<>(Arrays.asList(
+                "wkhtmltopdf", "--viewport-size", VIEWPORT_SIZE, "--enable-local-file-access",
                 // "--disable-smart-shrinking",
-                "--dpi", String.valueOf(CONVERSION_DPI),
-                "--image-quality", String.valueOf(IMAGE_QUALITY),
-                "--encoding", charsetName));
+                "--image-quality", String.valueOf(IMAGE_QUALITY), "--encoding", charsetName));
         cmd.addAll(extParams);
         cmd.add(tmpHtml.getAbsolutePath());
         cmd.add(pdf.getAbsolutePath());
@@ -397,11 +404,32 @@ public class MimeMessageConverter {
 
                     attachFile = null;
                 } catch (Exception e) {
-                    Logger.error("Could not save attachment to %s. Error: %s", attachFile, Throwables.getStackTraceAsString(e));
+                    Logger.error(
+                            "Could not save attachment to %s. Error: %s", attachFile, Throwables.getStackTraceAsString(e));
                 }
             }
         }
 
         Logger.info("Conversion finished");
+    }
+
+    public static String parseSubject(MimeMessage message) {
+        String subject;
+        try {
+            subject = message.getSubject();
+        } catch (MessagingException e) {
+            return ""; // fallback to empty subject
+        }
+
+        // heuristically decoding of malformed encoded subjects (see https://stackoverflow.com/a/4725175)
+        if (subject.startsWith("=?") && subject.endsWith("?=") && subject.contains(" ")) {
+            try {
+                subject = MimeUtility.decodeText(MimeUtility.unfold(subject.replaceAll(" ", "=20")));
+            } catch (UnsupportedEncodingException ex) {
+                // ignore this error
+            }
+        }
+
+        return subject;
     }
 }
