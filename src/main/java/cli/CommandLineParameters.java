@@ -82,7 +82,7 @@ public class CommandLineParameters {
     private String dpi = "300";
     @Parameter(
             names = {"-h", "--extraHeaders"}, description = "Add extra headers. Accepts comma-separated string. Options: Bcc, Cc. (This option is ignored when the hideHeaders option is enabled)")
-    private String extraHeaders;
+    private String extraHeaders = "";
 
     public List<String> getFiles() {
         return files;
@@ -196,5 +196,7 @@ public class CommandLineParameters {
         this.dpi = dpi;
     }
 
-    public String getExtraHeaders() { return extraHeaders; }
+    public String getExtraHeaders() {
+        return extraHeaders;
+    }
 }
