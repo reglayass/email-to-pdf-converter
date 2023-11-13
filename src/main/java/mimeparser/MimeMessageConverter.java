@@ -116,7 +116,7 @@ public class MimeMessageConverter {
      * @throws Exception
      */
     public static void convertToPdf(
-                                    String emailFilePath, String pdfOutputPath, boolean hideHeaders, boolean extractAttachments, String attachmentsdir, List<String> extParams) throws Exception {
+                                    String emailFilePath, String pdfOutputPath, String extraHeaders, boolean hideHeaders, boolean extractAttachments, String attachmentsdir, List<String> extParams) throws Exception {
         Logger.info("Start converting %s to %s", emailFilePath, pdfOutputPath);
 
         final MimeMessage message;
@@ -159,17 +159,22 @@ public class MimeMessageConverter {
             }
         }
 
-        String[] cc = new String[0];
-        String ccRaw = message.getHeader("Cc", null);
-        if (!Strings.isNullOrEmpty(ccRaw)) {
-            try {
-                ccRaw = MimeUtility.unfold(ccRaw);
-                cc = ccRaw.split(",");
-                for (int i = 0; i < cc.length; i++) {
-                    cc[i] = MimeUtility.decodeText(cc[i]);
+        ArrayList<String> extraHeadersList = new ArrayList<>(Arrays.asList(extraHeaders.split(",")));
+        HashMap<String, String[]> parsedExtraHeaders = new HashMap<>();
+        for (String extraHeaderName : extraHeadersList) {
+            String[] parsedHeader;
+            String headerRaw = message.getHeader(extraHeaderName, null);
+            if (!Strings.isNullOrEmpty(headerRaw)) {
+                try {
+                    headerRaw = MimeUtility.unfold(headerRaw);
+                    parsedHeader = headerRaw.split(",");
+                    for (int i = 0; i < parsedHeader.length; i++) {
+                        parsedHeader[i] = MimeUtility.decodeText(parsedHeader[i]);
+                    }
+                    parsedExtraHeaders.put(extraHeaderName, parsedHeader);
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
         }
 
@@ -303,8 +308,12 @@ public class MimeMessageConverter {
                         HEADER_FIELD_TEMPLATE, "To", HtmlEscapers.htmlEscaper().escape(Joiner.on(", ").join(recipients)));
             }
 
-            if (cc.length > 0) {
-                headers += String.format(HEADER_FIELD_TEMPLATE, "Cc", HtmlEscapers.htmlEscaper().escape(Joiner.on(", ").join(cc)));
+            if (!parsedExtraHeaders.isEmpty()) {
+                StringBuilder headersBuilder = new StringBuilder(headers);
+                for (String name : parsedExtraHeaders.keySet()) {
+                    headersBuilder.append(String.format(HEADER_FIELD_TEMPLATE, name, HtmlEscapers.htmlEscaper().escape(Joiner.on(", ").join(parsedExtraHeaders.get(name)))));
+                }
+                headers = headersBuilder.toString();
             }
 
             if (!Strings.isNullOrEmpty(sentDateStr)) {

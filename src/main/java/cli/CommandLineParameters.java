@@ -80,6 +80,9 @@ public class CommandLineParameters {
     @Parameter(
             names = {"-r", "--dpi"}, description = "Set wkhtmltopdf DPI. (default 300)")
     private String dpi = "300";
+    @Parameter(
+            names = {"-h", "--extraHeaders"}, description = "Add extra headers. Accepts comma-separated string. Options: Bcc, Cc. (This option is ignored when the hideHeaders option is enabled)")
+    private String extraHeaders;
 
     public List<String> getFiles() {
         return files;
@@ -192,4 +195,6 @@ public class CommandLineParameters {
     public void setDPI(String dpi) {
         this.dpi = dpi;
     }
+
+    public String getExtraHeaders() { return extraHeaders; }
 }
