@@ -272,8 +272,10 @@ public class MimeMessageConverter {
         if (recipients.length > 0) {
             Logger.debug("To: %s", Joiner.on(", ").join(recipients));
         }
-        if (cc.length > 0) {
-            Logger.debug("Cc: %s", Joiner.on(", ").join(cc));
+        if (!parsedExtraHeaders.isEmpty()) {
+            for (String name : parsedExtraHeaders.keySet()) {
+                Logger.debug("%s: %s", name, Joiner.on(", ").join(parsedExtraHeaders.get(name)));
+            }
         }
         Logger.debug("Date: %s", sentDateStr);
         String bodyExcerpt = htmlBody.replace("\n", "").replace("\r", "");
