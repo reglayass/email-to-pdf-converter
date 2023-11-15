@@ -81,7 +81,7 @@ public class CommandLineParameters {
             names = {"-r", "--dpi"}, description = "Set wkhtmltopdf DPI. (default 300)")
     private String dpi = "300";
     @Parameter(
-            names = {"-h", "--extraHeaders"}, description = "Add extra headers. Accepts comma-separated string. Options: Bcc, Cc. (This option is ignored when the hideHeaders option is enabled)")
+            names = {"-h", "--extra-headers"}, description = "Specify additional, comma-separated headers to the converted e-mail. Options: Bcc, Cc. Example: 'Bcc,Cc'")
     private String extraHeaders = "";
 
     public List<String> getFiles() {

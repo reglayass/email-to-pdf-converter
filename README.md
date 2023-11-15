@@ -49,6 +49,9 @@ Usage: EmailToPDFConverter [options] <email-file>
       Do not add email headers (subject, from, etc.) at the beginning of the
       PDF document.
       Default: false
+    -h, --extra-headers
+      Specify additional, comma-separated headers to the converted e-mail. Options: Bcc, Cc.
+      Example: 'Bcc,Cc'
     -o, --output-filepath
       Filepath of the produced PDF document. If this option is ommited the PDF
       will be placed alongside the email File.
